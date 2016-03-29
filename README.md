@@ -8,21 +8,21 @@ For a detailed list of changes between old ROSS and SR please visit [the wiki](h
 
 [![Build Status](https://travis-ci.org/carothersc/ROSS.svg?branch=master)](https://travis-ci.org/carothersc/ROSS)
 [![codecov.io](http://codecov.io/github/carothersc/ROSS/coverage.svg?branch=master)](http://codecov.io/github/carothersc/ROSS?branch=master)
-[Doxygen](http://carothersc.github.io/ROSS/ROSS-docs/docs/html)
+[![Doxygen](https://img.shields.io/badge/doxygen-reference-blue.svg)](http://carothersc.github.io/ROSS/ROSS-docs/docs/html)
 
 ## History
 
-ROSS's histroy starts with a one-week re-implementation of [Georgia Tech Time Warp (GTW)](http://www.cc.gatech.edu/computing/pads/tech-parallel-gtw.html) by Shawn Pearce and Dave Bauer in 1999.
+ROSS's history starts with a one-week re-implementation of [Georgia Tech Time Warp (GTW)](http://www.cc.gatech.edu/computing/pads/tech-parallel-gtw.html) by Shawn Pearce and Dave Bauer in 1999.
 After 10 years of in-house development, version 5.0 of [Rensselaer's Optimistic Simulation System](http://sourceforge.net/projects/pdes/) went live at SourceForge.net.
-Thus the offical version history began!
+Thus the official version history began!
 
 Through the years ROSS has migrated from CVS, to SVN, to Git and GitHub.com.
 The code was maintained by Chris Carothers and his graduate students at RPI ([publications](http://cs.rpi.edu//~chrisc/#publications)).
-Over the years, sevearal features (including a shared-memory version) were implemented within ROSS.
+Over the years, several features (including a shared-memory version) were implemented within ROSS.
 Some of these features have since been optimized out, leaving behind cruft.
 
 In early 2015 a sleeker version of ROSS was released.
-Developed as Simplifed ROSS ([gonsie/SR](http://github.com/gonsie/SR)), this version removed many files, functions, and variables that had become deprecated over time.
+Developed as Simplified ROSS ([gonsie/SR](http://github.com/gonsie/SR)), this version removed many files, functions, and variables that had become deprecated over time.
 
 ## Requirements
 
