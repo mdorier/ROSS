@@ -190,44 +190,48 @@ static void tw_sched_batch(tw_pe * me) {
 	ckp = clp->kp;
 	me->cur_event = cev;
 	ckp->last_time = cev->recv_ts;
-	
+
 	/* Save state if no reverse computation is available */
 	if (!clp->type->revent) {
 	  tw_error(TW_LOC, "Reverse Computation must be implemented!");
 	}
-	    
+
 	start = tw_clock_read();
 	reset_bitfields(cev);
 
 	// if NOT A SUSPENDED LP THEN FORWARD PROC EVENTS
 	if( !(clp->suspend_flag) )
 	  {
-	    (*clp->type->event)(clp->cur_state, &cev->cv, 
+        // state-save and update the LP's critical path
+        unsigned int prev_cp = clp->critical_path;
+        clp->critical_path = ROSS_MAX(clp->critical_path, cev->critical_path)+1;
+	    (*clp->type->event)(clp->cur_state, &cev->cv,
 				tw_event_data(cev), clp);
+        cev->critical_path = prev_cp;
 	  }
 	ckp->s_nevent_processed++;
 	me->stats.s_event_process += tw_clock_read() - start;
-	    
+
 	/* We ran out of events while processing this event.  We
 	 * cannot continue without doing GVT and fossil collect.
 	 */
-	
-	if (me->cev_abort) 
+
+	if (me->cev_abort)
 	  {
 	    start = tw_clock_read();
 	    me->stats.s_nevent_abort++;
 	    me->cev_abort = 0;
-	    
+
 	    tw_event_rollback(cev);
 	    tw_pq_enqueue(me->pq, cev);
-	    
+
 	    cev = tw_eventq_peek(&ckp->pevent_q);
 	    ckp->last_time = cev ? cev->recv_ts : me->GVT;
-	    
+
 	    tw_gvt_force_update(me);
-	    
+
 	    me->stats.s_event_abort += tw_clock_read() - start;
-	    
+
 	    break;
 	  } // END ABORT CHECK
 
@@ -287,12 +291,12 @@ static void tw_sched_batch_realtime(tw_pe * me) {
 	ckp = clp->kp;
 	me->cur_event = cev;
 	ckp->last_time = cev->recv_ts;
-	
+
 	/* Save state if no reverse computation is available */
 	if (!clp->type->revent) {
 	  tw_error(TW_LOC, "Reverse Computation must be implemented!");
 	}
-	    
+
 	start = tw_clock_read();
 
 	reset_bitfields(cev);
@@ -300,32 +304,36 @@ static void tw_sched_batch_realtime(tw_pe * me) {
 	// if NOT A SUSPENDED LP THEN FORWARD PROC EVENTS
 	if( !(clp->suspend_flag) )
 	  {
-	    (*clp->type->event)(clp->cur_state, &cev->cv, 
+        // state-save and update the LP's critical path
+        unsigned int prev_cp = clp->critical_path;
+        clp->critical_path = ROSS_MAX(clp->critical_path, cev->critical_path)+1;
+	    (*clp->type->event)(clp->cur_state, &cev->cv,
 				tw_event_data(cev), clp);
+        cev->critical_path = prev_cp;
 	  }
 	ckp->s_nevent_processed++;
 	me->stats.s_event_process += tw_clock_read() - start;
-	    
+
 	/* We ran out of events while processing this event.  We
 	 * cannot continue without doing GVT and fossil collect.
 	 */
-	
-	if (me->cev_abort) 
+
+	if (me->cev_abort)
 	  {
 	    start = tw_clock_read();
 	    me->stats.s_nevent_abort++;
 	    me->cev_abort = 0;
-	    
+
 	    tw_event_rollback(cev);
 	    tw_pq_enqueue(me->pq, cev);
-	    
+
 	    cev = tw_eventq_peek(&ckp->pevent_q);
 	    ckp->last_time = cev ? cev->recv_ts : me->GVT;
-	    
+
 	    tw_gvt_force_update_realtime(me);
-	    
+
 	    me->stats.s_event_abort += tw_clock_read() - start;
-	    
+
 	    break; // leave the batch function
 	  } // END ABORT CHECK
 
@@ -356,7 +364,9 @@ void tw_sched_init(tw_pe * me) {
     tw_net_barrier(me);
 
 #ifdef USE_RIO
+    tw_clock start = tw_clock_read();
     io_load_events(me);
+    me->stats.s_rio_load += (tw_clock_read() - start);
     tw_net_barrier(me);
 #endif
 
@@ -395,6 +405,7 @@ void tw_scheduler_sequential(tw_pe * me) {
     printf("*** START SEQUENTIAL SIMULATION ***\n\n");
 
     tw_wall_now(&me->start_time);
+    me->stats.s_total = tw_clock_read();
 
     while ((cev = tw_pq_dequeue(me->pq))) {
         tw_lp *clp = cev->dest_lp;
@@ -413,7 +424,11 @@ void tw_scheduler_sequential(tw_pe * me) {
         }
 
         reset_bitfields(cev);
+        clp->critical_path = ROSS_MAX(clp->critical_path, cev->critical_path)+1;
         (*clp->type->event)(clp->cur_state, &cev->cv, tw_event_data(cev), clp);
+        if (*clp->type->commit) {
+            (*clp->type->commit)(clp->cur_state, &cev->cv, tw_event_data(cev), clp);
+        }
 
         if (me->cev_abort){
             tw_error(TW_LOC, "insufficient event memory");
@@ -423,6 +438,7 @@ void tw_scheduler_sequential(tw_pe * me) {
         tw_event_free(me, cev);
     }
     tw_wall_now(&me->end_time);
+    me->stats.s_total = tw_clock_read() - me->stats.s_total;
 
     printf("*** END SIMULATION ***\n\n");
 
@@ -498,7 +514,11 @@ void tw_scheduler_conservative(tw_pe * me) {
 
             start = tw_clock_read();
             reset_bitfields(cev);
+            clp->critical_path = ROSS_MAX(clp->critical_path, cev->critical_path)+1;
             (*clp->type->event)(clp->cur_state, &cev->cv, tw_event_data(cev), clp);
+            if (*clp->type->commit) {
+                (*clp->type->commit)(clp->cur_state, &cev->cv, tw_event_data(cev), clp);
+            }
 
             ckp->s_nevent_processed++;
             me->stats.s_event_process += tw_clock_read() - start;
@@ -558,11 +578,11 @@ void tw_scheduler_optimistic(tw_pe * me) {
     tw_wall_now(&me->end_time);
     me->stats.s_total = tw_clock_read() - me->stats.s_total;
 
+    tw_net_barrier(me);
+
     if ((g_tw_mynode == g_tw_masternode) && me->local_master) {
         printf("*** END SIMULATION ***\n\n");
     }
-
-    tw_net_barrier(me);
 
     // call the model PE finalize function
     (*me->type.final)(me);
@@ -572,6 +592,8 @@ void tw_scheduler_optimistic(tw_pe * me) {
 
 void tw_scheduler_optimistic_realtime(tw_pe * me) {
     tw_clock start;
+
+    g_tw_gvt_realtime_interval = g_tw_gvt_interval * g_tw_clock_rate / 1000;
 
     if ((g_tw_mynode == g_tw_masternode) && me->local_master) {
         printf("*** START PARALLEL OPTIMISTIC SIMULATION WITH SUSPEND LP FEATURE AND REAL TIME GVT ***\n\n");
@@ -605,11 +627,11 @@ void tw_scheduler_optimistic_realtime(tw_pe * me) {
     tw_wall_now(&me->end_time);
     me->stats.s_total = tw_clock_read() - me->stats.s_total;
 
+    tw_net_barrier(me);
+
     if ((g_tw_mynode == g_tw_masternode) && me->local_master) {
         printf("*** END SIMULATION ***\n\n");
     }
-
-    tw_net_barrier(me);
 
     // call the model PE finalize function
     (*me->type.final)(me);
@@ -633,7 +655,7 @@ void tw_scheduler_optimistic_debug(tw_pe * me) {
     printf(" 2) One 1 KP is used.\n");
     printf("    NOTE: use the --nkp=1 argument to the simulation to ensure that\n");
     printf("          it only uses 1 KP.\n");
-    printf(" 3) Events ARE NEVER RECLAIMED.\n");
+    printf(" 3) Events ARE NEVER RECLAIMED (LP Commit Functions are not called).\n");
     printf(" 4) Executes til out of memory (16 events left) and \n    injects rollback to first before primodal init event.\n");
     printf(" 5) g_tw_rollback_time = %13.12lf \n", g_tw_rollback_time);
     printf("/***************************************************************************/\n");
@@ -653,7 +675,12 @@ void tw_scheduler_optimistic_debug(tw_pe * me) {
 
         /* don't update GVT */
         reset_bitfields(cev);
+
+        // state-save and update the LP's critical path
+        unsigned int prev_cp = clp->critical_path;
+        clp->critical_path = ROSS_MAX(clp->critical_path, cev->critical_path)+1;
         (*clp->type->event)(clp->cur_state, &cev->cv, tw_event_data(cev), clp);
+        cev->critical_path = prev_cp;
 
         ckp->s_nevent_processed++;
 
@@ -666,13 +693,13 @@ void tw_scheduler_optimistic_debug(tw_pe * me) {
             break;
         }
     }
-    
+
     // If we've run out of free events or events to process (maybe we're past end time?)
     // Perform all the rollbacks!
     printf("/******************* Starting Rollback Phase ******************************/\n");
     tw_kp_rollback_to( g_tw_kp[0], g_tw_rollback_time );
     printf("/******************* Completed Rollback Phase ******************************/\n");
-    
+
     tw_wall_now(&me->end_time);
 
     printf("*** END SIMULATION ***\n\n");

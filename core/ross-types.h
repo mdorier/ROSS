@@ -83,6 +83,7 @@ typedef void (*map_custom_f) (void);
 typedef void (*pre_run_f) (void *sv, tw_lp * me);
 typedef void (*event_f) (void *sv, tw_bf * cv, void *msg, tw_lp * me);
 typedef void (*revent_f) (void *sv, tw_bf * cv, void *msg, tw_lp * me);
+typedef void (*commit_f) (void *sv, tw_bf * cv, void *msg, tw_lp * me);
 typedef void (*final_f) (void *sv, tw_lp * me);
 typedef void (*statecp_f) (void *sv_dest, void *sv_src);
 
@@ -96,6 +97,7 @@ struct tw_lptype {
     pre_run_f pre_run; /**< @brief Second stage LP initialization */
     event_f event; /**< @brief LP event handler routine */
     revent_f revent;  /**< @brief LP Reverse event handler routine */
+    commit_f commit;  /**< @brief LP Commit event routine */
     final_f final; /**< @brief Final handler routine */
     map_f map; /**< @brief LP Mapping of LP gid -> remote PE routine */
     size_t state_sz; /**< @brief Number of bytes that SV is for the LP */
@@ -154,6 +156,11 @@ struct tw_statistics {
     tw_clock s_lz4;
 
     tw_stat s_events_past_end;
+
+#ifdef USE_RIO
+    tw_clock s_rio_load;
+    tw_clock s_rio_lp_init;
+#endif
 };
 
 #ifdef ROSS_MEMORY
@@ -246,7 +253,10 @@ enum tw_event_owner {
     TW_net_asend = 6,       /**< @brief Network transmission in progress */
     TW_net_acancel = 7,     /**< @brief Network transmission in progress */
     TW_pe_sevent_q = 8,     /**< @brief In tw_pe.sevent_q */
-    TW_pe_free_q = 9        /**< @brief In tw_pe.free_q */
+    TW_pe_free_q = 9,       /**< @brief In tw_pe.free_q */
+#ifdef USE_RIO
+    IO_buffer = 10,         /**< @brief RIO captured event */
+#endif
 };
 typedef enum tw_event_owner tw_event_owner;
 
@@ -299,6 +309,8 @@ struct tw_event {
     void *delta_buddy;              /**< @brief Delta memory from buddy allocator. */
     size_t      delta_size;         /**< @brief Size of delta. */
 
+    unsigned int critical_path;     /**< @brief Critical path of this event */
+
     tw_lp       *dest_lp;           /**< @brief Destination LP ID */
     tw_lp       *src_lp;            /**< @brief Sending LP ID */
     tw_stime     recv_ts;           /**< @brief Actual time to be received */
@@ -338,6 +350,8 @@ struct tw_lp {
     tw_lptype  *type; /**< @brief Type of this LP, including service callbacks */
     tw_rng_stream *rng; /**< @brief  RNG stream array for this LP */
 
+    unsigned int critical_path; /**< @brief Critical path value for this LP */
+
   /* tw_suspend variables */
   tw_event    *suspend_event;
   tw_stime     suspend_time;
@@ -357,6 +371,7 @@ struct tw_kp {
     tw_pe *pe;      /**< @brief PE that services this KP */
     tw_kp *next;    /**< @brief Next KP in the PE's service list */
     tw_out *output; /**< @brief Output messages */
+    int lp_count;
 
 #ifdef ROSS_QUEUE_kp_splay
     tw_eventpq *pq;

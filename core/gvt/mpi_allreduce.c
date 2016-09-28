@@ -12,9 +12,8 @@ static unsigned int gvt_force = 0;
 static const tw_optdef gvt_opts [] =
 {
 	TWOPT_GROUP("ROSS MPI GVT"),
-	TWOPT_UINT("gvt-interval", g_tw_gvt_interval, "GVT Interval"),
-	TWOPT_ULONGLONG("gvt-realtime-interval", g_tw_gvt_realtime_interval, "GVT Realtime Interval"),
-	TWOPT_STIME("report-interval", gvt_print_interval, 
+	TWOPT_UINT("gvt-interval", g_tw_gvt_interval, "GVT Interval: Iterations through scheduling loop (synch=1,2,3,4), or ms between GVTs (synch=5)"),
+	TWOPT_STIME("report-interval", gvt_print_interval,
 			"percent of runtime to print GVT"),
 	TWOPT_END()
 };
@@ -58,7 +57,7 @@ tw_gvt_stats(FILE * f)
 	fprintf(f, "\t%-50s %11d\n", "Forced GVT", gvt_force);
 	fprintf(f, "\t%-50s %11d\n", "Total GVT Computations", g_tw_gvt_done);
 	fprintf(f, "\t%-50s %11lld\n", "Total All Reduce Calls", all_reduce_cnt);
-	fprintf(f, "\t%-50s %11.2lf\n", "Average Reduction / GVT", 
+	fprintf(f, "\t%-50s %11.2lf\n", "Average Reduction / GVT",
 			(double) ((double) all_reduce_cnt / (double) g_tw_gvt_done));
 }
 
@@ -114,7 +113,7 @@ tw_gvt_step2(tw_pe *me)
 	while(1)
 	  {
 	    tw_net_read(me);
-	
+
 	    // send message counts to create consistent cut
 	    local_white = me->s_nwhite_sent - me->s_nwhite_recv;
 	    all_reduce_cnt++;
@@ -126,7 +125,7 @@ tw_gvt_step2(tw_pe *me)
 			     MPI_SUM,
 			     MPI_COMM_WORLD) != MPI_SUCCESS)
 	      tw_error(TW_LOC, "MPI_Allreduce for GVT failed");
-	    
+
 	    if(total_white == 0)
 	      break;
 	  }
@@ -202,5 +201,5 @@ tw_gvt_step2(tw_pe *me)
 	g_tw_gvt_done++;
 
 	// reset for the next gvt round -- for use in realtime GVT mode only!!
-	g_tw_gvt_interval_start_cycles = tw_clock_read(); 
+	g_tw_gvt_interval_start_cycles = tw_clock_read();
  }
