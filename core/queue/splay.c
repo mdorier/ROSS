@@ -163,50 +163,58 @@ splay(tw_event * node)
 void
 tw_pq_enqueue(splay_tree *st, tw_event * e)
 {
-	tw_event       *n = st->root;
-
-	st->nitems++;
-	if (st->nitems > st->max_size)
-		st->max_size = st->nitems;
-
-	e->state.owner = TW_pe_pq;
-
-	RIGHT(e) = LEFT(e) = 0;
-	if (n)
+    tw_event       *n = st->root;
+    
+    st->nitems++;
+    if (st->nitems > st->max_size)
+	st->max_size = st->nitems;
+    
+    e->state.owner = TW_pe_pq;
+    
+    RIGHT(e) = LEFT(e) = 0;
+    if (n)
+    {
+	for (;;)
 	{
-		for (;;)
+	    if (KEY(n) <= KEY(e))
+	    {
+		/* if((KEY(n) == KEY(e)) && */
+		/*    (n->dest_lp == e->dest_lp) ) */
+		/* { */
+		/*     e->dest_lp->pe->stats.s_pe_event_ties++; */
+		/*     printf("Ev Tie on LP %ld, New E ts = %lf Ev ID = %d, Old E ts = %lf Ev ID %d\n", */
+		/* 	   e->dest_lp->gid, e->recv_ts, e->event_id, n->recv_ts, n->event_id ); */
+		/* } */
+		
+		if (RIGHT(n))
+		    n = RIGHT(n);
+		else
 		{
-			if (KEY(n) <= KEY(e))
-			{
-				if (RIGHT(n))
-					n = RIGHT(n);
-				else
-				{
-					RIGHT(n) = e;
-					UP(e) = n;
-					break;
-				}
-			} else
-			{
-				if (LEFT(n))
-					n = LEFT(n);
-				else
-				{
-					if (st->least == n)
-						st->least = e;
-					LEFT(n) = e;
-					UP(e) = n;
-					break;
-				}
-			}
+		    RIGHT(n) = e;
+		    UP(e) = n;
+		    break;
 		}
-		splay(e);
-		st->root = e;
-	} else
-	{
-		st->root = st->least = e;
-		UP(e) = 0;
+	    } else
+	    {
+		if (LEFT(n))
+		    n = LEFT(n);
+		else
+		{
+		    if (st->least == n)
+			st->least = e;
+		    LEFT(n) = e;
+		    UP(e) = n;
+		    break;
+		}
+	    }
 	}
+	splay(e);
+	st->root = e;
+    } else
+    {
+	st->root = st->least = e;
+	UP(e) = 0;
+    }
 }
 
 tw_event       *
