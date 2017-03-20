@@ -32,6 +32,8 @@ struct tw_optdef
 #define TWOPT_FLAG(n,v,h)  { TWOPTTYPE_FLAG,  (n), (h), &(v) }
 #define TWOPT_END()        { (tw_opttype)0,   NULL, NULL, NULL }
 
+/** Reinitialize the set of options **/
+extern void tw_opt_reinit();
 /** Remove options from the command line arguments. */
 extern void tw_opt_parse(int *argc, char ***argv);
 /** Add an opt group */

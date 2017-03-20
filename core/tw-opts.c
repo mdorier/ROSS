@@ -11,6 +11,12 @@ static const tw_optdef *opt_groups[10];
 static unsigned int opt_index = 0;
 
 void
+tw_opt_reinit()
+{
+  opt_index = 0;
+}
+
+void
 tw_opt_add(const tw_optdef *options)
 {
 	if(!options || !options->type || is_empty(options))
